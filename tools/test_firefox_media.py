@@ -4,7 +4,6 @@
 from contextlib import redirect_stdout
 import hashlib
 import io
-import json
 from pathlib import Path
 import stat
 import struct

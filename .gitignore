@@ -3,3 +3,4 @@ dist/
 .spotify-profile/
 .env
 *.log
+__pycache__/

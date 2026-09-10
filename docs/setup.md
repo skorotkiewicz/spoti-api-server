@@ -40,6 +40,8 @@ Use Node.js 22 or later, Bun, and a desktop display for the initial login. Comma
    bun run start
    ```
 
+c4ff3eaba085e2eb793917424b55623b7ba6ece7145f6e0fe02c1b858908ce79
+
    Keep the token private. This environment variable lasts for the current shell. The API listens only on `127.0.0.1:3210`.
 
 5. In another terminal, set `API_TOKEN` to the same value and check the session.
