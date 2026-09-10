@@ -6,6 +6,14 @@ Includes search and entity snapshots, your library and liked songs, private play
 
 **Account endpoints are experimental.** Offline browser tests cover their behavior against fixtures, not Spotify's current logged-in UI. Headless audio playback is not guaranteed.
 
+## Quick start
+
+```sh
+./setup.sh
+```
+
+This installs dependencies, downloads OpenH264 and Widevine DRM into the Firefox profile, and opens Firefox for one-time Spotify login.
+
 ## Start here
 
 1. Follow [setup and browser login](docs/setup.md).

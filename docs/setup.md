@@ -2,7 +2,17 @@
 
 Use Node.js 22 or later, Bun, and a desktop display for the initial login. Commands below assume a POSIX shell and the project directory.
 
-## Install and log in
+## Quick start
+
+For Firefox on Linux x86_64:
+
+```sh
+./setup.sh
+```
+
+This runs dependency installation, builds TypeScript, installs OpenH264 and Widevine DRM into the Firefox profile via `tools/install_firefox_media.py`, and launches Firefox for interactive Spotify login.
+
+## Install and log in manually
 
 1. Install dependencies and select an installed browser.
 
