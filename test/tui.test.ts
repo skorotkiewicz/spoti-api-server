@@ -145,7 +145,7 @@ test('TUI does not retry accepted actions, follow redirects, or hang on interrup
     const finished = once(child, 'close');
     const timer = setTimeout(() => child.kill('SIGKILL'), 5000);
     try {
-      await requested;
+      await Promise.race([requested, finished.then(() => { throw new Error('TUI exited before requesting player state.'); })]);
       child.kill('SIGINT');
       assert.equal((await finished)[0], 0, 'SIGINT must cancel the pending request and exit cleanly');
     } finally { clearTimeout(timer); }

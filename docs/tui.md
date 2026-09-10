@@ -66,4 +66,4 @@ bun run build
 node --test dist/test/tui.test.js
 ```
 
-The tests run the actual TUI process against a local fake HTTP API. They check authentication headers, query encoding, result paging, track selection, playback bodies, error messages, token validation, and terminal escape removal. They do not play music or touch your Spotify profile.
+The tests run the actual TUI process against a local fake HTTP API. They check authentication headers, query encoding, result paging, track selection, playback bodies, error messages, token validation, and terminal escape removal. They also check redirect rejection, request interruption, and that an accepted action is not retried when its state check fails. They do not play music or touch your Spotify profile.
