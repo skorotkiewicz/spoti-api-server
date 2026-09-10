@@ -78,8 +78,11 @@ async function main() {
     }
     const track = player.track === null ? null : object(player.track);
     if (track && typeof track.name !== 'string') throw new Error('API returned invalid track state.');
+    const artists = track?.artists === undefined ? [] : track.artists;
+    if (!Array.isArray(artists) || !artists.every((artist) => typeof artist === 'string')) throw new Error('API returned invalid artists.');
+    const byline = artists.map((artist) => artist.trim()).filter(Boolean).join(', ');
     const state = player.playing === true ? 'Playing' : player.playing === false ? 'Paused' : 'Unknown';
-    status = `${state}: ${track?.name ?? 'No track'}  ${player.position ?? '?'} / ${player.duration ?? '?'}`;
+    status = `${state}: ${track?.name ?? 'No track'}${byline ? ` / ${byline}` : ''}  ${player.position ?? '?'} / ${player.duration ?? '?'}`;
   };
 
   const list = async (path: string, title: string) => {

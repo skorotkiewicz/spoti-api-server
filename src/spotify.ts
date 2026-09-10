@@ -117,9 +117,13 @@ export class SpotifyBrowser {
         ?? bar.querySelector<HTMLAnchorElement>('a[href*="/track/"]');
       const name = title?.innerText.trim();
       const link = title?.closest<HTMLAnchorElement>('a[href]') ?? title?.querySelector<HTMLAnchorElement>('a[href]');
+      let artists = [...bar.querySelectorAll<HTMLAnchorElement>('a[href*="/artist/"]')].map((artist) => artist.innerText.trim()).filter(Boolean);
+      if (!artists.length) {
+        artists = [...bar.querySelectorAll<HTMLElement>('[data-testid="context-item-info-artist"]')].map((artist) => artist.innerText.trim()).filter(Boolean);
+      }
       return {
         playing: label === 'Pause' ? true : label === 'Play' ? false : null,
-        track: name ? { name, url: link?.getAttribute('href') ?? null } : null,
+        track: name ? { name, artists: [...new Set(artists)], url: link?.getAttribute('href') ?? null } : null,
         position: bar.querySelector('[data-testid="playback-position"]')?.textContent ?? null,
         duration: bar.querySelector('[data-testid="playback-duration"]')?.textContent ?? null,
         capturedAt: new Date().toISOString(),

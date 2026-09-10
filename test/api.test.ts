@@ -197,10 +197,32 @@ test('player reads track titles from track links, album links, and unlinked meta
       const response = await request('/v1/player');
       assert.equal(response.status, 200);
       const player = await response.json();
-      assert.deepEqual(player.track, track, markup);
+      assert.deepEqual(player.track, track ? { ...track, artists: [] } : null, markup);
       assert.equal(player.playing, true);
       assert.equal(player.position, '0:10');
       assert.equal(player.duration, '3:00');
+    }
+  } finally {
+    await page.$eval(selector, (bar, html) => { bar.innerHTML = html; }, original);
+  }
+});
+
+test('player extracts deduplicated artist names only from the player bar', async () => {
+  const selector = '[data-testid="now-playing-bar"]';
+  const original = await page.$eval(selector, (bar) => bar.innerHTML);
+  const cases = [
+    { markup: '', artists: [] },
+    { markup: `<a href="/artist/${id}"> First artist </a><a href="/artist/${id}">First artist</a><a href="/artist/${'B'.repeat(22)}">Guest artist</a>`, artists: ['First artist', 'Guest artist'] },
+    { markup: '<span data-testid="context-item-info-artist">Unlinked artist</span>', artists: ['Unlinked artist'] },
+  ];
+  try {
+    for (const { markup, artists } of cases) {
+      await page.$eval(selector, (bar, html) => { bar.innerHTML = html; }, original + markup);
+      const response = await request('/v1/player');
+      assert.equal(response.status, 200);
+      const player = await response.json();
+      assert.equal(player.track.name, 'Test song');
+      assert.deepEqual(player.track.artists, artists);
     }
   } finally {
     await page.$eval(selector, (bar, html) => { bar.innerHTML = html; }, original);
