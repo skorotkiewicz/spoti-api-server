@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import { after, before, test } from 'node:test';
-import { chromium, type Browser, type Page } from 'playwright';
+import type { Browser, Page } from 'puppeteer-core';
+import { browserType, launchBrowser } from '../src/browser.js';
 import { ApiError, BrowserQueue, Cache } from '../src/core.js';
 import { createApi } from '../src/server.js';
 import { SpotifyBrowser } from '../src/spotify.js';
@@ -18,19 +19,23 @@ let upstreamError = false;
 const visits = new Map<string, number>();
 
 before(async () => {
-  browser = await chromium.launch(process.env.BROWSER_EXECUTABLE_PATH
-    ? { executablePath: process.env.BROWSER_EXECUTABLE_PATH } : { channel: 'chromium' });
+  browser = await launchBrowser();
   page = await browser.newPage();
   // Offline UI contract fixture. This is not evidence of current authenticated Spotify compatibility.
-  await page.route('**/*', async (route) => {
-    const path = new URL(route.request().url()).pathname;
+  await page.setRequestInterception(true);
+  page.on('request', async (request) => {
+    if (!request.isNavigationRequest()) {
+      await request.abort();
+      return;
+    }
+    const path = new URL(request.url()).pathname;
     visits.set(path, (visits.get(path) ?? 0) + 1);
     if (upstreamError) {
-      await route.fulfill({ status: 503, body: 'Unavailable' });
+      await request.respond({ status: 503, body: 'Unavailable' });
       return;
     }
     const empty = path === '/search/nothing';
-    await route.fulfill({ contentType: 'text/html', body: `<!doctype html>
+    await request.respond({ contentType: 'text/html', body: `<!doctype html>
       <html lang="en"><body>
       <button data-testid="${loggedIn ? 'user-widget-link' : 'login-button'}">Account</button>
       <main>${path.startsWith('/search/') ? '' : '<h1>Test resource</h1>'}
@@ -48,7 +53,16 @@ before(async () => {
         <button data-testid="control-button-skip-forward" onclick="this.dataset.clicked='yes'">Next</button>
         <button data-testid="control-button-skip-back" disabled>Previous</button>
         <span data-testid="playback-position">0:10</span><span data-testid="playback-duration">3:00</span>
-      </aside></body></html>` });
+      </aside>
+      <script>
+        if (location.pathname === '/search/delayed') setTimeout(() => {
+          const link = document.createElement('a');
+          link.href = '/track/${'B'.repeat(22)}';
+          link.textContent = 'Late result';
+          document.querySelector('main').append(link);
+        }, 200);
+      </script>
+      </body></html>` });
   });
   const spotify = new SpotifyBrowser(page);
   await spotify.open();
@@ -112,6 +126,13 @@ test('DOM extraction, normalized cache keys, concurrent misses, and explicit inv
   }
 });
 
+test('snapshots include results that arrive after the first link renders', async () => {
+  const response = await request('/v1/search?q=delayed');
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert(data.items.some((item: { name: string }) => item.name === 'Late result'));
+});
+
 test('upstream errors are not cached and do not poison the browser queue', async () => {
   upstreamError = true;
   assert.equal((await request('/v1/search?q=retry')).status, 502);
@@ -142,16 +163,23 @@ test('play and pause are idempotent; unavailable controls report errors', async 
   assert.equal((await control('play')).status, 202);
   assert.equal((await control('play')).status, 202);
   assert.equal((await (await request('/v1/player')).json()).playing, true);
-  assert.equal(await page.getByTestId('control-button-playpause').getAttribute('data-clicks'), '1');
+  assert.equal(await page.$eval('[data-testid="control-button-playpause"]', (e) => e.getAttribute('data-clicks')), '1');
   assert.equal((await control('pause')).status, 202);
   assert.equal((await control('pause')).status, 202);
   assert.equal((await (await request('/v1/player')).json()).playing, false);
-  assert.equal(await page.getByTestId('control-button-playpause').getAttribute('data-clicks'), '2');
+  assert.equal(await page.$eval('[data-testid="control-button-playpause"]', (e) => e.getAttribute('data-clicks')), '2');
   assert.equal((await control('next')).status, 202);
-  assert.equal(await page.getByTestId('control-button-skip-forward').getAttribute('data-clicked'), 'yes');
+  assert.equal(await page.$eval('[data-testid="control-button-skip-forward"]', (e) => e.getAttribute('data-clicked')), 'yes');
   assert.equal((await control('previous')).status, 409);
   assert.equal((await control('play', { trackId: id })).status, 202);
   assert.equal((await (await request('/v1/player')).json()).playing, true);
+});
+
+test('browser selection recognizes Firefox paths without changing Chromium selection', () => {
+  assert.equal(browserType('/usr/sbin/firefox'), 'firefox');
+  assert.equal(browserType('/usr/bin/firefox-esr'), 'firefox');
+  assert.equal(browserType('/usr/sbin/chromium'), 'chrome');
+  assert.equal(browserType('/opt/google/chrome/chrome'), 'chrome');
 });
 
 test('cache expiration, eviction, bypass, and failed loads', async () => {
