@@ -175,6 +175,38 @@ test('play and pause are idempotent; unavailable controls report errors', async 
   assert.equal((await (await request('/v1/player')).json()).playing, true);
 });
 
+test('player reads track titles from track links, album links, and unlinked metadata', async () => {
+  const selector = '[data-testid="now-playing-bar"]';
+  const original = await page.$eval(selector, (bar) => bar.innerHTML);
+  const album = `/album/${id}?highlight=spotify:track:${id}`;
+  const cases = [
+    { markup: `<a href="/track/${id}">Test song</a>`, track: { name: 'Test song', url: `/track/${id}` } },
+    { markup: `<a data-testid="context-item-info-title" href="${album}">Test song</a>`, track: { name: 'Test song', url: album } },
+    { markup: `<div data-testid="context-item-info-title"><a href="${album}"> Test song </a></div>`, track: { name: 'Test song', url: album } },
+    { markup: '<span data-testid="context-item-info-title">Test song</span>', track: { name: 'Test song', url: null } },
+    { markup: '<span data-testid="context-item-info-title"> </span>', track: null },
+    { markup: '', track: null },
+  ];
+  try {
+    for (const { markup, track } of cases) {
+      await page.$eval(selector, (bar, { original, markup }) => {
+        bar.innerHTML = original;
+        bar.querySelector('a')!.outerHTML = markup;
+        bar.querySelector('[data-testid="control-button-playpause"]')!.setAttribute('aria-label', 'Pause');
+      }, { original, markup });
+      const response = await request('/v1/player');
+      assert.equal(response.status, 200);
+      const player = await response.json();
+      assert.deepEqual(player.track, track, markup);
+      assert.equal(player.playing, true);
+      assert.equal(player.position, '0:10');
+      assert.equal(player.duration, '3:00');
+    }
+  } finally {
+    await page.$eval(selector, (bar, html) => { bar.innerHTML = html; }, original);
+  }
+});
+
 test('browser selection recognizes Firefox paths without changing Chromium selection', () => {
   assert.equal(browserType('/usr/sbin/firefox'), 'firefox');
   assert.equal(browserType('/usr/bin/firefox-esr'), 'firefox');

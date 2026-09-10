@@ -113,10 +113,13 @@ export class SpotifyBrowser {
     return this.page.evaluate((selector) => {
       const bar = document.querySelector(selector)!;
       const label = bar.querySelector('[data-testid="control-button-playpause"]')?.getAttribute('aria-label');
-      const track = bar.querySelector<HTMLAnchorElement>('a[href*="/track/"]');
+      const title = bar.querySelector<HTMLElement>('[data-testid="context-item-info-title"]')
+        ?? bar.querySelector<HTMLAnchorElement>('a[href*="/track/"]');
+      const name = title?.innerText.trim();
+      const link = title?.closest<HTMLAnchorElement>('a[href]') ?? title?.querySelector<HTMLAnchorElement>('a[href]');
       return {
         playing: label === 'Pause' ? true : label === 'Play' ? false : null,
-        track: track ? { name: track.innerText, url: track.getAttribute('href') } : null,
+        track: name ? { name, url: link?.getAttribute('href') ?? null } : null,
         position: bar.querySelector('[data-testid="playback-position"]')?.textContent ?? null,
         duration: bar.querySelector('[data-testid="playback-duration"]')?.textContent ?? null,
         capturedAt: new Date().toISOString(),

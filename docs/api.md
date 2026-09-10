@@ -80,7 +80,7 @@ These routes require a signed-in Spotify session. Library results cover only ren
 }
 ```
 
-`playing` is `true`, `false`, or `null` for an unrecognized button label. `track` can be `null`; its URL is the browser link and can be relative. Position and duration are displayed strings, not parsed milliseconds, and can be `null` or placeholders. Responses describe the web player's displayed state, not an independently verified device state.
+`playing` is `true`, `false`, or `null` for an unrecognized button label. `track` is `null` when the player bar exposes no title. Its URL is the browser link, which can be relative, point to an album, or be `null` when the title has no link. Position and duration are displayed strings, not parsed milliseconds, and can be `null` or placeholders. Responses describe the web player's displayed state, not an independently verified device state.
 
 ### Control examples
 
