@@ -1,6 +1,6 @@
 node_modules/
 dist/
-.spotify-profile/
+.spotify-profile*/
 .env
 *.log
 __pycache__/
