@@ -1,9 +1,10 @@
-import type { Page } from 'playwright';
+import type { Page } from 'puppeteer-core';
 import { ApiError } from './core.js';
 
 const ORIGIN = 'https://open.spotify.com';
 const ACCOUNT = '[data-testid="user-widget-link"], [data-testid="user-widget-button"]';
 const LOGIN = '[data-testid="login-button"]';
+const BAR = '[data-testid="now-playing-bar"]';
 
 export type Snapshot = {
   url: string;
@@ -31,11 +32,12 @@ export class SpotifyBrowser {
   }
 
   async session() {
-    if (new URL(this.page.url()).hostname === 'accounts.spotify.com') {
-      return { authenticated: false };
-    }
-    await this.page.locator(`${ACCOUNT}, ${LOGIN}`).locator('visible=true').first().waitFor();
-    return { authenticated: await this.page.locator(ACCOUNT).first().isVisible() };
+    if (new URL(this.page.url()).hostname === 'accounts.spotify.com') return { authenticated: false };
+    await (await this.page.waitForFunction((selector) =>
+      [...document.querySelectorAll(selector)].some((element) => element.checkVisibility()),
+    {}, `${ACCOUNT}, ${LOGIN}`)).dispose();
+    return { authenticated: await this.page.evaluate((selector) =>
+      [...document.querySelectorAll(selector)].some((element) => element.checkVisibility()), ACCOUNT) };
   }
 
   async requireAccount() {
@@ -47,63 +49,79 @@ export class SpotifyBrowser {
   async snapshot(path: string, mode: 'search' | 'entity' | 'library' = 'entity'): Promise<Snapshot> {
     await this.open(path);
     if (mode === 'library') await this.requireAccount();
-    // Wait for page content, not just Spotify's empty application shell.
-    await this.page.waitForFunction((kind) => {
+    await (await this.page.waitForFunction((kind) => {
       const main = document.querySelector('main');
       if (!main) return false;
       const text = main.textContent ?? '';
-      const emptyOrError = /no results found|couldn't find|could not find|something went wrong|this page is not available|this playlist is not available|your liked songs will appear here|save your favourite songs|save your favorite songs|create your first playlist/i.test(text);
-      if (emptyOrError) return true;
-      if (kind === 'search') return !!main.querySelector('a[href*="/track/"], a[href*="/artist/"], a[href*="/album/"], a[href*="/playlist/"]');
+      if (/no results found|couldn't find|could not find|something went wrong|this page is not available|this playlist is not available|your liked songs will appear here|save your favourite songs|save your favorite songs|create your first playlist/i.test(text)) return true;
+      if (kind === 'search') return [...main.querySelectorAll<HTMLAnchorElement>('a[href]')].some((link) =>
+        /\/(track|artist|album|playlist)\/[A-Za-z0-9]{22}/.test(link.pathname) && link.checkVisibility() && link.innerText.trim());
       return !!main.querySelector('h1');
-    }, mode);
-    const main = this.page.locator('main');
-    const text = await main.innerText();
-    if (/couldn't find|could not find|this page is not available|this playlist is not available/i.test(text.slice(0, 500))) {
-      throw new ApiError(404, 'NOT_FOUND', 'Spotify did not expose this resource to the current account.');
-    }
-    if (/something went wrong/i.test(text.slice(0, 500))) {
-      throw new ApiError(502, 'SPOTIFY_PAGE_ERROR', 'Spotify displayed an error.');
-    }
-    const items = await main.locator('a[href]').evaluateAll((links) => {
+    }, {}, mode)).dispose();
+    // ponytail: wait for 500 ms of settled content, capped at 3 s; add scrolling/pagination for complete lists.
+    await this.page.evaluate(() => new Promise<void>((resolve) => {
+      const main = document.querySelector('main')!;
+      let quiet: number;
+      const finish = () => {
+        observer.disconnect();
+        window.clearTimeout(quiet);
+        window.clearTimeout(deadline);
+        resolve();
+      };
+      const observer = new MutationObserver(() => {
+        window.clearTimeout(quiet);
+        quiet = window.setTimeout(finish, 500);
+      });
+      const deadline = window.setTimeout(finish, 3000);
+      quiet = window.setTimeout(finish, 500);
+      observer.observe(main, { childList: true, subtree: true, characterData: true });
+    }));
+    const snapshot = await this.page.evaluate(() => {
+      const main = document.querySelector<HTMLElement>('main')!;
       const found = new Map<string, { type: string; id: string; name: string; url: string }>();
-      for (const element of links) {
-        const link = element as HTMLAnchorElement;
+      for (const link of main.querySelectorAll<HTMLAnchorElement>('a[href]')) {
         const url = new URL(link.href);
         const match = url.pathname.match(/^\/(?:intl-[^/]+\/)?(track|album|artist|playlist)\/([A-Za-z0-9]{22})\/?$/);
-        const name = (link.innerText || link.getAttribute('aria-label') || link.querySelector('img')?.alt || '').trim();
-        if (url.origin !== 'https://open.spotify.com' || !match || !name) continue;
+        const name = (link.innerText || link.title || link.getAttribute('aria-label') || link.querySelector('img')?.alt || '').trim();
+        if (url.origin !== 'https://open.spotify.com' || !match || !name || !link.checkVisibility()) continue;
         const [, type, id] = match as [string, string, string];
         const key = `${type}/${id}`;
         if (!found.has(key)) found.set(key, { type, id, name, url: `https://open.spotify.com/${key}` });
         if (found.size >= 200) break;
       }
-      return [...found.values()];
+      return {
+        url: location.href,
+        title: main.querySelector('h1')?.textContent ?? null,
+        text: main.innerText.slice(0, 30_000),
+        items: [...found.values()],
+        capturedAt: new Date().toISOString(),
+        complete: false as const,
+      };
     });
-    return {
-      url: this.page.url(),
-      title: await main.locator('h1').count() ? await main.locator('h1').first().textContent() : null,
-      text: text.slice(0, 30_000),
-      items,
-      capturedAt: new Date().toISOString(),
-      complete: false,
-    };
+    if (/couldn't find|could not find|this page is not available|this playlist is not available/i.test(snapshot.text.slice(0, 500))) {
+      throw new ApiError(404, 'NOT_FOUND', 'Spotify did not expose this resource to the current account.');
+    }
+    if (/something went wrong/i.test(snapshot.text.slice(0, 500))) {
+      throw new ApiError(502, 'SPOTIFY_PAGE_ERROR', 'Spotify displayed an error.');
+    }
+    return snapshot;
   }
 
   async player() {
     await this.requireAccount();
-    const bar = this.page.getByTestId('now-playing-bar');
-    const button = bar.getByTestId('control-button-playpause');
-    await button.waitFor();
-    const label = await button.getAttribute('aria-label');
-    const track = bar.locator('a[href*="/track/"]').first();
-    return {
-      playing: label === 'Pause' ? true : label === 'Play' ? false : null,
-      track: await track.count() ? { name: await track.innerText(), url: await track.getAttribute('href') } : null,
-      position: await bar.getByTestId('playback-position').textContent().catch(() => null),
-      duration: await bar.getByTestId('playback-duration').textContent().catch(() => null),
-      capturedAt: new Date().toISOString(),
-    };
+    await (await this.page.waitForSelector(`${BAR} [data-testid="control-button-playpause"]`, { visible: true }))?.dispose();
+    return this.page.evaluate((selector) => {
+      const bar = document.querySelector(selector)!;
+      const label = bar.querySelector('[data-testid="control-button-playpause"]')?.getAttribute('aria-label');
+      const track = bar.querySelector<HTMLAnchorElement>('a[href*="/track/"]');
+      return {
+        playing: label === 'Pause' ? true : label === 'Play' ? false : null,
+        track: track ? { name: track.innerText, url: track.getAttribute('href') } : null,
+        position: bar.querySelector('[data-testid="playback-position"]')?.textContent ?? null,
+        duration: bar.querySelector('[data-testid="playback-duration"]')?.textContent ?? null,
+        capturedAt: new Date().toISOString(),
+      };
+    }, BAR);
   }
 
   async control(action: 'play' | 'pause' | 'next' | 'previous', trackId?: string) {
@@ -111,29 +129,29 @@ export class SpotifyBrowser {
     if (trackId) {
       await this.snapshot(`/track/${trackId}`);
       await this.requireAccount();
-      const button = this.page.locator('main').getByTestId('play-button').first();
-      if (!(await button.count()) || !(await button.isEnabled())) {
-        throw new ApiError(409, 'CONTROL_UNAVAILABLE', 'Spotify did not expose an enabled track play button.');
-      }
-      // Do not toggle a track that is already playing.
-      if (!/^Pause(?:\s|$)/.test(await button.getAttribute('aria-label') ?? '')) await button.click();
-    } else {
-      const bar = this.page.getByTestId('now-playing-bar');
-      const id = action === 'next' ? 'control-button-skip-forward'
-        : action === 'previous' ? 'control-button-skip-back' : 'control-button-playpause';
-      const button = bar.getByTestId(id);
-      if (!(await button.count()) || !(await button.isEnabled())) {
-        throw new ApiError(409, 'CONTROL_UNAVAILABLE', 'Spotify did not expose this control. Check your account and active player.');
-      }
+    }
+    const id = action === 'next' ? 'control-button-skip-forward'
+      : action === 'previous' ? 'control-button-skip-back' : 'control-button-playpause';
+    const selector = trackId ? 'main [data-testid="play-button"]' : `${BAR} [data-testid="${id}"]`;
+    const button = await this.page.$(selector);
+    if (!button) throw new ApiError(409, 'CONTROL_UNAVAILABLE', 'Spotify did not expose this player control.');
+    try {
+      const state = await button.evaluate((element) => ({
+        enabled: !element.matches(':disabled, [aria-disabled="true"]') && element.checkVisibility(),
+        label: element.getAttribute('aria-label'),
+      }));
+      if (!state.enabled) throw new ApiError(409, 'CONTROL_UNAVAILABLE', 'Spotify disabled or hid this player control. Check your account and active player.');
       if (action === 'play' || action === 'pause') {
-        const label = await button.getAttribute('aria-label');
-        if (label !== 'Play' && label !== 'Pause') {
+        const current = trackId ? state.label?.match(/^(Play|Pause)(?:\s|$)/)?.[1] : state.label;
+        if (current !== 'Play' && current !== 'Pause') {
           throw new ApiError(409, 'CONTROL_UNAVAILABLE', 'Unrecognized player button. Set Spotify language to English.');
         }
-        if (label.toLowerCase() === action) await button.click();
+        if (current.toLowerCase() === action) await this.page.locator(selector).click();
       } else {
-        await button.click();
+        await this.page.locator(selector).click();
       }
+    } finally {
+      await button.dispose();
     }
     // A successful UI click is not proof of audio output or a remote-device state change.
     return { accepted: true, action, ...(trackId ? { trackId } : {}) };
