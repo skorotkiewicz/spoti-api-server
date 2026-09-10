@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.spotify-profile/
+.env
+*.log

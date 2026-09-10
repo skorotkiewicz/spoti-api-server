@@ -1,0 +1,17 @@
+{
+  "name": "spoti-browser-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local Spotify API backed only by browser interaction",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "tsc",
+    "check": "tsc --noEmit",
+    "start": "node dist/src/main.js",
+    "login": "node dist/src/main.js login",
+    "test": "npm run build && node --test dist/test/*.test.js"
+  },
+  "dependencies": { "playwright": "^1.58.2" },
+  "devDependencies": { "@types/node": "^22.0.0", "typescript": "^5.9.3" }
+}
