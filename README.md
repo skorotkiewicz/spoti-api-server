@@ -9,7 +9,7 @@ Includes search and entity snapshots, your library and liked songs, private play
 ## Start here
 
 1. Follow [setup and browser login](docs/setup.md).
-2. Use the routes in [API reference](docs/api.md).
+2. Run `bun run tui` with the same `API_TOKEN` to open the [terminal player](docs/tui.md), or use the routes in [API reference](docs/api.md).
 3. Read [limits and verification](docs/limitations.md) before relying on the results.
 
 Node.js 22 or later runs the server. Bun can install dependencies and run the package scripts.

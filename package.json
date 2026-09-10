@@ -10,6 +10,7 @@
     "check": "tsc --noEmit",
     "start": "node dist/src/main.js",
     "login": "node dist/src/main.js login",
+    "tui": "npm run build && node dist/src/tui.js",
     "test": "npm run build && node --test dist/test/*.test.js"
   },
   "dependencies": { "puppeteer-core": "^24.0.0" },
