@@ -4,18 +4,20 @@ Use Node.js 22 or later, Bun, and a desktop display for the initial login. Comma
 
 ## Install and log in
 
-1. Install dependencies and Chromium.
+1. Install dependencies and select an installed browser.
 
    ```sh
    bun install --frozen-lockfile
-   bunx playwright install chromium
+   export BROWSER_EXECUTABLE_PATH=/usr/sbin/firefox
    ```
 
-   On Linux, Playwright may report missing system libraries. Install the listed packages through your system package manager. If Chromium is already installed, you can skip the browser download and set its absolute path instead:
+   Stock Firefox uses WebDriver BiDi through Puppeteer. No patched Firefox or geckodriver is needed. To use Chromium instead:
 
    ```sh
    export BROWSER_EXECUTABLE_PATH=/usr/sbin/chromium
    ```
+
+   Install the browser through your system package manager if it is missing. Without an executable path, the app looks for a standard Google Chrome installation. It does not download browsers automatically.
 
 2. Build the server.
 
@@ -51,22 +53,21 @@ Use Node.js 22 or later, Bun, and a desktop display for the initial login. Comma
 
 ## Browser and playback settings
 
-Chromium runs headlessly by default. For playback troubleshooting, stop the server and run it visibly:
+Both Firefox and Chromium run headlessly by default. Keep `BROWSER_EXECUTABLE_PATH` set to the same browser for login and server startup. For playback troubleshooting, stop the server and run it visibly:
 
 ```sh
 HEADLESS=0 bun run start
 ```
 
-If installed, Google Chrome can offer DRM support that bundled Chromium lacks. Use the same browser selection for login and server startup:
+If installed, Google Chrome can offer DRM support that Chromium lacks. To select a standard Chrome installation:
 
 ```sh
 unset BROWSER_EXECUTABLE_PATH
-export BROWSER_CHANNEL=chrome
 bun run login
 HEADLESS=0 bun run start
 ```
 
-The server does not install Chrome or configure Widevine. Account tier, region, codec support, protected-content settings, and Spotify's player restrictions still apply. A successful control response does not prove audio is playing.
+Firefox needs DRM-controlled content enabled in its own settings for protected playback. The server does not install browsers or configure Widevine. Account tier, region, codec support, protected-content settings, and Spotify's player restrictions still apply. A successful control response does not prove audio is playing.
 
 ## Configuration
 
@@ -78,11 +79,12 @@ Environment variables are read at startup. The server does not load `.env` files
 | `PORT` | `3210` | Local TCP port, 1 through 65535. |
 | `HEADLESS` | `1` | `0` opens the server browser visibly. Login always opens visibly. |
 | `CACHE_TTL_SECONDS` | `300` | Snapshot TTL, 0 through 3600. `0` disables caching. Library and liked songs are capped at 30 seconds. |
-| `SPOTIFY_PROFILE_DIR` | `.spotify-profile` | Dedicated persistent browser profile, relative to the working directory or absolute. |
-| `BROWSER_CHANNEL` | `chromium` | Playwright browser channel, such as `chromium` or installed `chrome`. |
-| `BROWSER_EXECUTABLE_PATH` | Unset | Absolute browser executable path. Overrides channel selection. |
+| `SPOTIFY_PROFILE_DIR` | `.spotify-profile` | Profile root, relative to the working directory or absolute. The app appends `firefox` or `chrome` to keep engine profiles separate. |
+| `BROWSER_EXECUTABLE_PATH` | Unset | Absolute installed browser path. A filename containing `firefox` selects Firefox and BiDi; other filenames select Chrome/Chromium and CDP. If unset, use standard installed Chrome. |
 
 ## Protect the account session
+
+Each engine has its own profile, `.spotify-profile/firefox` or `.spotify-profile/chrome` by default. Log in separately when switching between Firefox and Chromium. Chrome and Chromium use the same engine profile.
 
 The profile contains cookies and browser storage that grant account access. The app creates its directory with owner-only permissions on POSIX systems. The default profile and `.env` are ignored by Git. If you select another profile path, exclude it from source control and backups yourself. Do not point the app at your everyday browser profile.
 

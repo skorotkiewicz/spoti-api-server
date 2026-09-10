@@ -1,6 +1,6 @@
 # Spotify browser API
 
-A local, single-account API server in TypeScript. Playwright drives the Spotify web player. The server reads rendered HTML and clicks player buttons. It does not call Spotify's Web API, extract access tokens, or replay private network requests.
+A local, single-account API server in TypeScript. Puppeteer drives the Spotify web player in Chromium or Firefox. The server reads rendered HTML and clicks player buttons. It does not call Spotify's Web API, extract access tokens, or replay private network requests.
 
 Includes search and entity snapshots, your library and liked songs, private playlist snapshots by ID, player controls, and a bounded in-memory cache.
 
@@ -19,7 +19,7 @@ Node.js 22 or later runs the server. Bun can install dependencies and run the pa
 ```sh
 bun install --frozen-lockfile
 bun run check
-bun run test
+BROWSER_EXECUTABLE_PATH=/usr/sbin/firefox bun run test
 ```
 
-Install Chromium first with `bunx playwright install chromium`, or set `BROWSER_EXECUTABLE_PATH` to an installed Chromium binary.
+Set `BROWSER_EXECUTABLE_PATH` to an installed Firefox, Chromium, or Chrome executable. Without it, the server looks for a standard Google Chrome installation. No browser is downloaded automatically.

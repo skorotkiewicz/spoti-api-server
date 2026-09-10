@@ -49,7 +49,7 @@ Illustrative search result, shortened:
 }
 ```
 
-`title` is the main heading, or `null`. `text` contains at most 30,000 characters from the main page, including any rendered recommendations and footer. `items` contains at most 200 deduplicated track, album, artist, or playlist links in DOM order. Names come from link text or accessible labels.
+`title` is the main heading, or `null`. `text` contains at most 30,000 characters from the main page, including any rendered recommendations and footer. `items` contains at most 200 deduplicated track, album, artist, or playlist links in DOM order. Names come from link text, titles, or accessible labels.
 
 **`items` is not a canonical tracklist.** An album page can contain links to the album's artist and recommended albums. The server does not infer fields that Spotify did not render. Lists are always marked `complete: false`; there is no pagination or automatic scrolling in this version. `capturedAt` remains unchanged on cache hits.
 
@@ -120,7 +120,7 @@ curl -X DELETE -H "Authorization: Bearer $API_TOKEN" \
 
 Response: `{"cleared":true}`.
 
-One browser page handles requests in order. At most 16 browser operations may be active or queued. Identical concurrent reads reuse the first successful result through this queue. HTTP health checks bypass the queue. Navigation times out after 30 seconds, individual UI waits after 12 seconds. Queue wait time is additional.
+One browser page handles requests in order. At most 16 browser operations may be active or queued. Identical concurrent reads reuse the first successful result through this queue. HTTP health checks bypass the queue. Navigation times out after 30 seconds, individual UI waits after 12 seconds. Snapshots also wait for 500 milliseconds without text or child-node changes in the main page, capped at 3 seconds. This reduces partially loaded results but does not guarantee completeness. Queue wait time is additional.
 
 ## Errors
 

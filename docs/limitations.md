@@ -2,7 +2,7 @@
 
 ## Browser-only boundary
 
-Only Playwright page navigation, DOM reads, and UI clicks access Spotify. Spotify's own browser code still makes its normal network requests. The server does not use a Spotify SDK, call Spotify APIs from Node, issue custom browser fetch requests, intercept credentials, or reuse captured internal endpoints.
+Only Puppeteer page navigation, DOM reads, and UI clicks access Spotify. Chromium uses CDP; stock Firefox uses WebDriver BiDi. Spotify's own browser code still makes its normal network requests. The server does not use a Spotify SDK, call Spotify APIs from Node, issue custom browser fetch requests, intercept credentials, or reuse captured internal endpoints.
 
 The app does not download audio, bypass DRM, evade bot checks, or automate verification challenges. Review Spotify's terms and your account's permitted use before running automation. Stop if Spotify blocks the session.
 
@@ -18,7 +18,7 @@ The app does not download audio, bypass DRM, evade bot checks, or automate verif
 
 ```sh
 bun run check
-bun run test
+BROWSER_EXECUTABLE_PATH=/usr/sbin/firefox bun run test
 ```
 
 For an existing Chromium installation:
@@ -27,10 +27,10 @@ For an existing Chromium installation:
 BROWSER_EXECUTABLE_PATH=/usr/sbin/chromium bun run test
 ```
 
-Tests use a real Chromium browser with intercepted navigation and local HTML fixtures. They make no live Spotify requests and need no account. They exercise:
+Tests use the selected real browser with intercepted navigation and local HTML fixtures. The suite has passed with both `/usr/sbin/firefox` and `/usr/sbin/chromium`. They make no live Spotify requests and need no account. They exercise:
 
 1. HTTP authentication, cross-origin rejection, URL and JSON validation, and request-body limits.
-2. DOM extraction, duplicate-link removal, cache hits, expiry, capacity eviction, disabling, and invalidation.
+2. DOM extraction, delayed result rendering, duplicate-link removal, cache hits, expiry, capacity eviction, disabling, and invalidation.
 3. Queue ordering, capacity limits, and recovery after a failed request.
 4. Account-required routes, including checks before private cache hits.
 5. Idempotent play/pause, track selection, next-button clicks, and unavailable controls.
@@ -84,10 +84,10 @@ Run this after logging in. Use a playlist that your account can access. These co
 
 | Symptom | Check |
 | --- | --- |
-| Browser executable missing | Run `bunx playwright install chromium`, or configure an installed executable. |
+| Browser executable missing | Install Firefox, Chromium, or Chrome through your system package manager, then set `BROWSER_EXECUTABLE_PATH` to its absolute path. |
 | Profile already in use | Stop the other server or login process using that profile. |
 | Login marker not found | Return to the web player, set English, and dismiss dialogs. Account-menu selectors may need updating in `src/spotify.ts`. |
 | Playback click accepted but silent | Test in visible Chrome with protected content enabled. Check account restrictions and the active Spotify device. |
 | Page or library timeout | Run with `HEADLESS=0` and inspect the page. Do not interpret a timeout as an empty library. |
 
-The app does not automatically retry blocked Spotify navigation. Raw Playwright errors, cookies, and page dumps are not returned to API clients.
+The app does not automatically retry blocked Spotify navigation. Raw Puppeteer errors, cookies, and page dumps are not returned to API clients.
