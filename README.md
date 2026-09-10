@@ -1,0 +1,25 @@
+# Spotify browser API
+
+A local, single-account API server in TypeScript. Playwright drives the Spotify web player. The server reads rendered HTML and clicks player buttons. It does not call Spotify's Web API, extract access tokens, or replay private network requests.
+
+Includes search and entity snapshots, your library and liked songs, private playlist snapshots by ID, player controls, and a bounded in-memory cache.
+
+**Account endpoints are experimental.** Offline browser tests cover their behavior against fixtures, not Spotify's current logged-in UI. Headless audio playback is not guaranteed.
+
+## Start here
+
+1. Follow [setup and browser login](docs/setup.md).
+2. Use the routes in [API reference](docs/api.md).
+3. Read [limits and verification](docs/limitations.md) before relying on the results.
+
+Node.js 22 or later runs the server. Bun can install dependencies and run the package scripts.
+
+## Checks
+
+```sh
+bun install --frozen-lockfile
+bun run check
+bun run test
+```
+
+Install Chromium first with `bunx playwright install chromium`, or set `BROWSER_EXECUTABLE_PATH` to an installed Chromium binary.
