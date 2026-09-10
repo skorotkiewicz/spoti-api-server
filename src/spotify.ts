@@ -82,7 +82,7 @@ export class SpotifyBrowser {
     });
     return {
       url: this.page.url(),
-      title: await main.locator('h1').first().textContent().catch(() => null),
+      title: await main.locator('h1').count() ? await main.locator('h1').first().textContent() : null,
       text: text.slice(0, 30_000),
       items,
       capturedAt: new Date().toISOString(),
