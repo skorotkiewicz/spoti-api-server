@@ -1,7 +1,7 @@
 import { chmod, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
-import { chromium } from 'playwright';
+import { browserType, launchBrowser } from './browser.js';
 import { createApi } from './server.js';
 import { SpotifyBrowser } from './spotify.js';
 
@@ -27,18 +27,12 @@ async function main() {
   if (process.env.HEADLESS !== undefined && !['0', '1'].includes(process.env.HEADLESS)) {
     throw new Error('HEADLESS must be 0 or 1.');
   }
-  const profile = resolve(process.env.SPOTIFY_PROFILE_DIR ?? '.spotify-profile');
+  const profile = resolve(process.env.SPOTIFY_PROFILE_DIR ?? '.spotify-profile', browserType());
   await mkdir(profile, { recursive: true, mode: 0o700 });
   await chmod(profile, 0o700);
-  const context = await chromium.launchPersistentContext(profile, {
-    ...(process.env.BROWSER_EXECUTABLE_PATH
-      ? { executablePath: process.env.BROWSER_EXECUTABLE_PATH }
-      : { channel: process.env.BROWSER_CHANNEL ?? 'chromium' }),
-    headless: !login && process.env.HEADLESS !== '0',
-    locale: 'en-US',
-    viewport: { width: 1440, height: 1000 },
-  });
-  const spotify = new SpotifyBrowser(context.pages()[0] ?? await context.newPage());
+  const browser = await launchBrowser(profile, !login && process.env.HEADLESS !== '0');
+  const page = (await browser.pages())[0] ?? await browser.newPage();
+  const spotify = new SpotifyBrowser(page);
   try {
     await spotify.open();
     if (login) {
@@ -49,7 +43,7 @@ async function main() {
         console.log('Spotify session saved. You can start the server now.');
       } finally {
         prompt.close();
-        await context.close();
+        await browser.close();
       }
       return;
     }
@@ -62,16 +56,16 @@ async function main() {
     const shutdown = async () => {
       server.close();
       server.closeAllConnections();
-      await context.close();
+      await browser.close();
     };
     process.once('SIGINT', shutdown);
     process.once('SIGTERM', shutdown);
-    context.once('close', () => {
+    browser.once('disconnected', () => {
       server.close();
       server.closeAllConnections();
     });
   } catch (error) {
-    await context.close();
+    await browser.close();
     throw error;
   }
 }

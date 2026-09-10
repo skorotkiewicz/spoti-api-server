@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { errors } from 'playwright';
+import { TimeoutError } from 'puppeteer-core';
 import { ApiError, BrowserQueue, Cache } from './core.js';
 import { SpotifyBrowser, type Snapshot } from './spotify.js';
 
@@ -129,7 +129,7 @@ export function createApi(spotify: SpotifyBrowser, token: string, cacheTtlMs = 3
     } catch (error) {
       if (res.destroyed || res.headersSent) return;
       const problem = error instanceof ApiError ? error
-        : error instanceof errors.TimeoutError
+        : error instanceof TimeoutError
           ? new ApiError(504, 'BROWSER_TIMEOUT', 'Spotify did not expose the expected UI in time. Check login, language, consent dialogs, and selector compatibility.')
           : new ApiError(502, 'BROWSER_ERROR', 'Browser operation failed. Check the browser session and restart if it closed.');
       send(res, problem.status, { error: { code: problem.code, message: problem.message } });

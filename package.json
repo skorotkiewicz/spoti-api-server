@@ -12,6 +12,6 @@
     "login": "node dist/src/main.js login",
     "test": "npm run build && node --test dist/test/*.test.js"
   },
-  "dependencies": { "playwright": "^1.58.2" },
+  "dependencies": { "puppeteer-core": "^24.0.0" },
   "devDependencies": { "@types/node": "^22.0.0", "typescript": "^5.9.3" }
 }
